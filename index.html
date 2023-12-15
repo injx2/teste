@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Telemetria e Sensores</title>
+  <style>
+    /* Estilos gerais */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    /* Estilos para os gráficos */
+    .charts-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-gap: 20px;
+      justify-items: center;
+      margin-top: 20px;
+    }
+
+    /* Estilos para os medidores das variáveis */
+    .variables-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-end;
+      margin-top: 20px;
+    }
+
+    .level-container {
+      width: 100px;
+      height: 200px;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: center;
+      background-color: #eee;
+      border: 1px solid #ccc;
+      margin: 0 10px;
+      padding: 5px;
+    }
+
+    .level {
+      width: 100%;
+      background-color: #ccc;
+      border-radius: 5px;
+      transition: height 0.3s ease-in-out, background-color 0.3s ease-in-out;
+    }
+
+    .value {
+      margin-top: 5px;
+      text-align: center;
+      font-size: 12px;
+      width: 100%;
+    }
+
+    /* Botão de conexão */
+    #connectButton {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 20px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.3s ease-in-out;
+    }
+
+    #connectButton:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Telemetria e Sensores</h1>
+
+  <!-- Botão para conectar à porta serial -->
+  <button id="connectButton">Conectar à Porta Serial</button>
+
+  <!-- Contêiner para os gráficos -->
+  <div class="charts-container">
+    <div id="container1" style="min-width: 400px; max-width: 400px; height: 400px;"></div>
+    <div id="container2" style="min-width: 400px; max-width: 400px; height: 400px;"></div>
+  </div>
+
+
+  <!-- Medidores das variáveis -->
+  <div class="variables-container">
+
+    <!-- Medidores das variáveis C a H -->
+    <div class="level-container" id="batteryContainer">
+      <div class="level" id="batteryLevel"></div>
+      <div class="value" id="batteryValue">Battery: 0%</div>
+    </div>
+
+    <div class="level-container" id="fuelContainer">
+      <div class="level" id="fuelLevel"></div>
+      <div class="value" id="fuelValue">Fuel: 0%</div>
+    </div>
+
+    <div class="level-container" id="engineTempContainer">
+      <div class="level" id="engineTempLevel"></div>
+      <div class="value" id="engineTempValue">Engine Temp: 0°C</div>
+    </div>
+
+    <div class="level-container" id="cvtTempContainer">
+      <div class="level" id="cvtTempLevel"></div>
+      <div class="value" id="cvtTempValue">CVT Temp: 0°C</div>
+    </div>
+
+    <div class="level-container" id="frontPressureContainer">
+      <div class="level" id="frontPressureLevel"></div>
+      <div class="value" id="frontPressureValue">Front Pressure: 0</div>
+    </div>
+
+    <div class="level-container" id="rearPressureContainer">
+      <div class="level" id="rearPressureLevel"></div>
+      <div class="value" id="rearPressureValue">Rear Pressure: 0</div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/modules/exporting.js"></script>
+
+
+  <script>
+    let variableA = 0;
+    let variableB = 0;
+    let variableC = 0;
+    let variableD = 0;
+    let variableE = 0;
+    let variableF = 0;
+    let variableG = 0;
+    let variableH = 0;
+
+    let serialPort;
+    let receivedData = '';
+
+    function createOrUpdateGauge(containerId, titleText, yAxisMax, seriesName, variableToUpdate, valueSuffix) {
+      const chart = Highcharts.chart(containerId, {
+        chart: {
+          type: "gauge"
+        },
+        title: {
+          text: titleText
+        },
+        pane: {
+          startAngle: -90,
+          endAngle: 90,
+          background: null
+        },
+        yAxis: {
+          min: 0,
+          max: yAxisMax,
+          minorTickInterval: "auto",
+          // Outras configurações...
+        },
+        series: [{
+          name: seriesName,
+          data: [variableToUpdate],
+          tooltip: {
+            valueSuffix: valueSuffix
+          }
+        }]
+      });
+
+      return chart;
+    }
+
+    function updateCharts() {
+      const chart1 = createOrUpdateGauge("container1", "Speed", 60, "Speed", variableA, " km/h");
+      const chart2 = createOrUpdateGauge("container2", "RPM", 5000, "RPM", variableB, " RPM");
+
+      setInterval(function () {
+        chart1.series[0].points[0].update(variableA);
+        chart2.series[0].points[0].update(variableB);
+      }, 1000);
+    }
+
+    async function connectSerial() {
+      try {
+        if (serialPort && serialPort.readable) {
+          console.log('Port is already open.');
+          return;
+        }
+
+        serialPort = await navigator.serial.requestPort();
+        await serialPort.open({ baudRate: 115200 }); // Altere a velocidade conforme necessário
+
+        const reader = serialPort.readable.getReader();
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            console.log('Reader has been canceled');
+            break;
+          }
+
+          const decodedString = new TextDecoder().decode(value);
+          receivedData += decodedString;
+
+          if (receivedData.includes('\n')) {
+            const messages = receivedData.split('\n');
+
+            for (let i = 0; i < messages.length - 1; i++) {
+              const letter = messages[i].charAt(0);
+              const number = parseInt(messages[i].substring(1));
+
+              switch (letter) {
+                case 'A':
+                  variableA = number;
+                  break;
+                case 'B':
+                  variableB = number;
+                  break;
+                case 'C':
+                  variableC = number;
+                  updateLevel(variableC, 'battery', 100);
+                  break;
+                case 'D':
+                  variableD = number;
+                  updateLevel(variableD, 'fuel', 100);
+                  break;
+                case 'E':
+                  variableE = number;
+                  updateTempLevel(variableE, 'engineTemp', 75, 90, 65, 74, 91, 100, 120);
+                  break;
+                case 'F':
+                  variableF = number;
+                  updateTempLevel(variableF, 'cvtTemp', 40, 55, 30, 39, 56, 65, 80);
+                  break;
+                case 'G':
+                  variableG = number;
+                  updatePressureLevel(variableG, 'frontPressure', 50);
+                  break;
+                case 'H':
+                  variableH = number;
+                  updatePressureLevel(variableH, 'rearPressure', 50);
+                  break;
+                default:
+                  console.log('Invalid letter:', letter);
+              }
+
+              console.log('Variable A (Speed):', variableA);
+              console.log('Variable B (RPM):', variableB);
+              console.log('Variable C (Battery Level):', variableC);
+              console.log('Variable D (Fuel Level):', variableD);
+              console.log('Variable E (Engine Temp):', variableE);
+              console.log('Variable F (CVT Temp):', variableF);
+              console.log('Variable G (Front Pressure):', variableG);
+              console.log('Variable H (Rear Pressure):', variableH);
+            }
+
+            receivedData = messages[messages.length - 1];
+          }
+        }
+      } catch (err) {
+        console.error('Error reading serial data:', err);
+      }
+    }
+
+    function updateLevel(value, elementId, maxValue) {
+      const levelElement = document.getElementById(`${elementId}Level`);
+      const valueElement = document.getElementById(`${elementId}Value`);
+
+      valueElement.textContent = `${elementId.charAt(0).toUpperCase() + elementId.slice(1)}: ${value}`;
+      levelElement.style.height = `${(value / maxValue) * 100}%`;
+
+      if (value === maxValue) {
+        levelElement.style.height = '100%';
+      }
+
+      if (value > 60) {
+        levelElement.style.backgroundColor = 'green';
+      } else if (value > 20) {
+        levelElement.style.backgroundColor = 'yellow';
+      } else {
+        levelElement.style.backgroundColor = 'red';
+      }
+    }
+
+    function updateTempLevel(value, elementId, greenLow, greenHigh, yellowLow, yellowHigh, redLow, redHigh, maxLimit) {
+      const levelElement = document.getElementById(`${elementId}Level`);
+      const valueElement = document.getElementById(`${elementId}Value`);
+
+      valueElement.textContent = `${elementId.charAt(0).toUpperCase() + elementId.slice(1)}: ${value}`;
+      levelElement.style.height = `${(value / maxLimit) * 100}%`;
+
+      if (value === maxLimit) {
+        levelElement.style.height = '100%';
+      }
+
+      if (value >= greenLow && value <= greenHigh) {
+        levelElement.style.backgroundColor = 'green';
+      } else if ((value >= yellowLow && value <= yellowHigh) || (value >= redLow && value <= redHigh)) {
+        levelElement.style.backgroundColor = 'yellow';
+      } else {
+        levelElement.style.backgroundColor = 'red';
+      }
+    }
+
+    function updatePressureLevel(value, elementId, maxLimit) {
+      const levelElement = document.getElementById(`${elementId}Level`);
+      const valueElement = document.getElementById(`${elementId}Value`);
+
+      valueElement.textContent = `${elementId.charAt(0).toUpperCase() + elementId.slice(1)}: ${value}`;
+      levelElement.style.height = `${(value / maxLimit) * 100}%`;
+
+      if (value === maxLimit) {
+        levelElement.style.height = '100%';
+      }
+
+      if (value > 50) {
+        levelElement.style.backgroundColor = 'green';
+      } else if (value >= 47 && value <= 50) {
+        levelElement.style.backgroundColor = 'yellow';
+      } else {
+        levelElement.style.backgroundColor = 'red';
+      }
+    }
+
+    document.getElementById('connectButton').addEventListener('click', connectSerial);
+
+    document.addEventListener('DOMContentLoaded', function() {
+      updateCharts();
+    });
+  </script>
+</body>
+</html>
